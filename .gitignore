@@ -1,0 +1,3 @@
+data/raw/listings_raw.xlsx
+**/__pycache__/
+**/*.pyc
