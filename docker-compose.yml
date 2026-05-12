@@ -1,89 +1,92 @@
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.8.1
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__FERNET_KEY: ""
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__API__AUTH_BACKENDS: "airflow.api.auth.backend.basic_auth"
+    PYTHONPATH: /opt/airflow/services
+    _PIP_ADDITIONAL_REQUIREMENTS: "openpyxl pandas psycopg2-binary sqlalchemy"
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./services:/opt/airflow/services
+    - ./data:/opt/airflow/data
+    - airflow-logs:/opt/airflow/logs
+  depends_on:
+    postgres:
+      condition: service_healthy
+
 services:
   postgres:
     image: postgres:15
-    container_name: etl_postgres
-    restart: always
     environment:
-      POSTGRES_USER: etl_user
-      POSTGRES_PASSWORD: etl_password
-      POSTGRES_DB: etl_db
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql
     ports:
       - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 10s
+      retries: 5
 
   airflow-init:
-    image: apache/airflow:2.8.1
-    depends_on:
-      - postgres
-    env_file:
-      - airflow/config/airflow.env
-    entrypoint: >
-      bash -c "
-      airflow db migrate &&
-      airflow users create
-        --username admin
-        --password admin
-        --firstname Admin
-        --lastname User
-        --role Admin
-        --email admin@example.com
-      "
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - /var/run/docker.sock:/var/run/docker.sock
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        pip install psycopg2-binary pandas requests &&
+        airflow db init &&
+        airflow users create \
+          --username admin \
+          --password admin \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com
+    restart: on-failure
 
   airflow-webserver:
-    image: apache/airflow:2.8.1
-    depends_on:
-      - airflow-init
-    env_file:
-      - airflow/config/airflow.env
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - /var/run/docker.sock:/var/run/docker.sock
+    <<: *airflow-common
+    command: webserver
     ports:
       - "8080:8080"
-    command: webserver
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+    restart: always
 
   airflow-scheduler:
-    image: apache/airflow:2.8.1
-    depends_on:
-      - airflow-init
-    env_file:
-      - airflow/config/airflow.env
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags
-      - /var/run/docker.sock:/var/run/docker.sock
+    <<: *airflow-common
     command: scheduler
-
-  spark-master:
-    image: apache/spark:3.4.2
-    container_name: spark-master
-    restart: always
-    command: >
-      /opt/spark/bin/spark-class
-      org.apache.spark.deploy.master.Master
-    ports:
-      - "7077:7077"
-      - "8081:8080"
-    volumes:
-      - ./data:/data
-      - ./services:/data/services
-
-  spark-worker:
-    image: apache/spark:3.4.2
-    container_name: spark-worker
-    restart: always
     depends_on:
-      - spark-master
-    command: >
-      /opt/spark/bin/spark-class
-      org.apache.spark.deploy.worker.Worker
-      spark://spark-master:7077
-    volumes:
-      - ./data:/data
-      - ./services:/data/services
+      airflow-init:
+        condition: service_completed_successfully
+    restart: always
+
+  dashboard:
+    build:
+      context: ./dashboards
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: airbnb_dw
+      DB_USER: airflow
+      DB_PASSWORD: airflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: always
 
 volumes:
-  postgres_data:
+  postgres-db:
+  airflow-logs:
