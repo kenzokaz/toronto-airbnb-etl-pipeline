@@ -1,6 +1,6 @@
 # 🏠 Toronto Airbnb ETL & Analytics Pipeline
 
-> End-to-end containerized data pipeline — COSC4606 Final Project  
+> End-to-end containerized data pipeline 
 > **Extract → Transform → Load → Analyse** using real Toronto Airbnb data
 
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
@@ -89,8 +89,8 @@
 ### 1. Clone & start
 
 ```bash
-git clone https://github.com/kenzokaz/COSC4606_project.git
-cd COSC4606_project
+git clone https://github.com/kenzokaz/toronto-airbnb-etl-pipeline.git
+cd toronto-airbnb-etl-pipeline
 docker compose up -d
 ```
 
