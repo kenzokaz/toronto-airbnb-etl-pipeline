@@ -1,6 +1,7 @@
 # 🏠 Toronto Airbnb ETL & Analytics Pipeline
 
-> End-to-end containerized data pipeline 
+> End-to-end containerized data pipeline
+> 
 > **Extract → Transform → Load → Analyse** using real Toronto Airbnb data
 
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
